@@ -14,6 +14,9 @@ El frontend es una app en Ionic + Angular + Capacitor (repositorio aparte).
 - **@nestjs/config + Joi** para variables de entorno validadas
 - **@nestjs/terminus** para el health check
 - **pnpm** como gestor de paquetes
+- **class-validator + class-transformer** para validar los datos de entrada
+- **Helmet** para cabeceras de seguridad
+- **Swagger (@nestjs/swagger)** para la documentación interactiva
 
 ## Requisitos
 

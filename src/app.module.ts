@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { envValidationSchema } from './config/env.validation';
 import { MongooseModule } from '@nestjs/mongoose';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -36,6 +37,8 @@ import { MongooseModule } from '@nestjs/mongoose';
         },
       }),
     }),
+
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

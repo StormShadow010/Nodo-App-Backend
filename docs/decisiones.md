@@ -1,6 +1,10 @@
 # Registro de decisiones técnicas
 
-Cada entrada explica qué se decidió, por qué y qué alternativas se descartaron.
+## Documentación
+
+- API interactiva (solo en desarrollo): `http://localhost:3000/docs`
+- Decisiones técnicas: [docs/decisiones.md](docs/decisiones.md)
+  Cada entrada explica qué se decidió, por qué y qué alternativas se descartaron.
 
 ---
 
@@ -68,3 +72,30 @@ Cada entrada explica qué se decidió, por qué y qué alternativas se descartar
     en el futuro.
   - `v1` permite publicar una `v2` con cambios incompatibles sin romper las versiones
     instaladas de la app móvil.
+
+## 008 — Validación global de datos de entrada (ValidationPipe)
+
+- **Decisión:** `ValidationPipe` global con `whitelist`, `forbidNonWhitelisted` y `transform`.
+- **Por qué:**
+  - Cada endpoint valida su entrada con un DTO (class-validator), sin código manual.
+  - `whitelist` + `forbidNonWhitelisted` rechazan campos no declarados. Evita, por ejemplo,
+    que un cliente envíe `role: "admin"` al registrarse (asignación masiva).
+  - `transform` convierte el body en una instancia del DTO y ajusta los tipos.
+- **Reemplaza:** la validación manual (`requireString`, etc.) de la base Express.
+
+## 009 — Cabeceras de seguridad con Helmet y CORS
+
+- **Decisión:** Helmet activo en todos los entornos; CORS abierto durante el desarrollo.
+- **Por qué:** Helmet añade cabeceras que mitigan ataques comunes (clickjacking, sniffing de
+  tipo MIME, etc.). CORS abierto facilita probar desde la app Ionic en desarrollo.
+- **Pendiente antes de producción:** restringir CORS a los orígenes de la app
+  (`http://localhost` en Android y `capacitor://localhost` en iOS).
+- **Nota:** fuera de producción se desactiva la Content-Security-Policy de Helmet,
+  porque bloquea los scripts de la interfaz de Swagger.
+
+## 010 — Swagger solo fuera de producción
+
+- **Decisión:** la documentación interactiva se publica en `/docs` únicamente si
+  `NODE_ENV` no es `production`.
+- **Por qué:** la documentación se genera desde el código y siempre está actualizada, pero
+  en producción expondría el mapa completo de la API.
