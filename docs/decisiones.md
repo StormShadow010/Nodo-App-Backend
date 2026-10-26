@@ -1,10 +1,6 @@
 # Registro de decisiones técnicas
 
-## Documentación
-
-- API interactiva (solo en desarrollo): `http://localhost:3000/docs`
-- Decisiones técnicas: [docs/decisiones.md](docs/decisiones.md)
-  Cada entrada explica qué se decidió, por qué y qué alternativas se descartaron.
+Cada entrada explica qué se decidió, por qué y qué alternativas se descartaron.
 
 ---
 
@@ -29,6 +25,10 @@
   explícitamente solo dos:
   - `@parcel/watcher`: vigilancia de archivos para el modo `--watch`.
   - `unrs-resolver`: resolución de imports usada por el linter.
+- **Problema encontrado:** al instalar `class-validator` y `class-transformer` (dependencias
+  opcionales de `@nestjs/common`), pnpm creó dos copias de `@nestjs/common` y TypeScript
+  marcó tipos incompatibles. Se resolvió con `pnpm dedupe`. Ejecutarlo después de agregar
+  paquetes que sean dependencias opcionales de otros.
 - **Regla:** no mezclar npm y pnpm. El archivo de bloqueo oficial es `pnpm-lock.yaml`.
 
 ## 003 — CommonJS en lugar de ESM
@@ -78,9 +78,13 @@
 - **Decisión:** `ValidationPipe` global con `whitelist`, `forbidNonWhitelisted` y `transform`.
 - **Por qué:**
   - Cada endpoint valida su entrada con un DTO (class-validator), sin código manual.
-  - `whitelist` + `forbidNonWhitelisted` rechazan campos no declarados. Evita, por ejemplo,
-    que un cliente envíe `role: "admin"` al registrarse (asignación masiva).
+  - `whitelist` + `forbidNonWhitelisted` rechazan con 400 los campos no declarados en el DTO.
+    Evita, por ejemplo, que un cliente envíe `role: "admin"` al registrarse (asignación masiva),
+    y ayuda a detectar errores del frontend como campos mal escritos.
   - `transform` convierte el body en una instancia del DTO y ajusta los tipos.
+- **Por qué los DTO son clases y no interfaces:** las interfaces desaparecen al compilar a
+  JavaScript. Las clases existen en tiempo de ejecución y guardan los decoradores como
+  metadatos, que el `ValidationPipe` lee para validar.
 - **Reemplaza:** la validación manual (`requireString`, etc.) de la base Express.
 
 ## 009 — Cabeceras de seguridad con Helmet y CORS
@@ -99,3 +103,36 @@
   `NODE_ENV` no es `production`.
 - **Por qué:** la documentación se genera desde el código y siempre está actualizada, pero
   en producción expondría el mapa completo de la API.
+
+## 011 — Separación de módulos `users` y `auth`
+
+- **Decisión:** `users` solo accede a los datos; `auth` contiene registro, login y tokens.
+- **Por qué:** cada módulo tiene una sola responsabilidad. `UsersModule` exporta su servicio
+  y `AuthModule` lo importa, sin duplicar el acceso a la base.
+
+## 012 — Contraseñas cifradas con bcryptjs
+
+- **Decisión:** se guarda solo el hash (10 rondas de sal), nunca la contraseña.
+- **Por qué bcryptjs y no bcrypt:** es JavaScript puro; no compila código nativo, lo que evita
+  problemas en Windows y con los bloqueos de build scripts de pnpm.
+- **Formato del hash:** `$2b$10$` + sal (22 caracteres) + hash (31 caracteres). La sal viaja
+  dentro del hash, por eso no se guarda aparte, y dos usuarios con la misma contraseña tienen
+  hashes distintos.
+- **Límite:** bcrypt usa solo los primeros 72 bytes. El DTO limita a 72 caracteres; con tildes
+  o ñ (2 bytes) una contraseña larga podría superar ese límite. Aceptado para este proyecto.
+
+## 013 — La contraseña nunca sale de la base por defecto
+
+- **Decisión:** el campo `password` tiene `select: false`.
+- **Por qué:** ninguna consulta la devuelve por accidente. Solo el login la pide de forma
+  explícita con `select('+password')`.
+- **Nota:** `select: false` no aplica a lo que devuelve `create()`, por eso el servicio vuelve
+  a consultar el usuario antes de retornarlo.
+
+## 014 — Validación en dos capas y correos duplicados
+
+- **DTO:** valida la entrada HTTP y responde 400 con mensajes claros.
+- **Esquema:** última barrera; protege la base aunque el dato llegue por otro camino.
+- **Correos repetidos:** el servicio normaliza el correo (`trim` + minúsculas) antes de buscar,
+  y verifica antes de crear (409). Si dos registros llegan al mismo tiempo, ambos pasarían esa
+  verificación, pero el índice `unique` de MongoDB solo deja insertar uno.

@@ -12,11 +12,12 @@ El frontend es una app en Ionic + Angular + Capacitor (repositorio aparte).
 - **NestJS** (TypeScript, CommonJS)
 - **MongoDB Atlas** con **Mongoose**
 - **@nestjs/config + Joi** para variables de entorno validadas
-- **@nestjs/terminus** para el health check
-- **pnpm** como gestor de paquetes
 - **class-validator + class-transformer** para validar los datos de entrada
+- **bcryptjs** para cifrar contraseñas
 - **Helmet** para cabeceras de seguridad
 - **Swagger (@nestjs/swagger)** para la documentación interactiva
+- **@nestjs/terminus** para el health check
+- **pnpm** como gestor de paquetes
 
 ## Requisitos
 
@@ -57,26 +58,35 @@ o tiene un formato inválido.
 
 ```
 src/
-  main.ts                 → arranque, prefijo global /api/v1
-  app.module.ts           → módulo raíz: config, conexión a MongoDB y módulos
+  main.ts                    → arranque: prefijo /api/v1, Helmet, CORS, validación, Swagger
+  app.module.ts              → módulo raíz: config, conexión a MongoDB y módulos
   config/
-    env.validation.ts     → esquema Joi de las variables de entorno
+    env.validation.ts        → esquema Joi de las variables de entorno
   modules/
-    health/               → health check (estado del servidor y de MongoDB)
+    health/                  → health check (estado del servidor y de MongoDB)
+    users/
+      schemas/user.schema.ts → esquema del usuario
+      users.service.ts       → acceso a datos de usuarios
+    auth/
+      dto/register.dto.ts    → validación del registro
+      auth.service.ts        → registro (normalización, duplicados, cifrado)
+      auth.controller.ts     → rutas /auth
 docs/
-  decisiones.md           → registro de decisiones técnicas
+  decisiones.md              → registro de decisiones técnicas
 ```
 
 ## Endpoints
 
 Base: `http://localhost:3000/api/v1`
 
-| Método | Ruta      | Descripción                                                                         |
-| ------ | --------- | ----------------------------------------------------------------------------------- |
-| GET    | `/health` | Estado del servidor y de MongoDB. 200 si todo está bien, 503 si la base no responde |
+| Método | Ruta             | Descripción                                                                         |
+| ------ | ---------------- | ----------------------------------------------------------------------------------- |
+| GET    | `/health`        | Estado del servidor y de MongoDB. 200 si todo está bien, 503 si la base no responde |
+| POST   | `/auth/register` | Registra un usuario. 201 creado · 400 datos inválidos · 409 correo repetido         |
 
 ## Documentación
 
+- API interactiva (solo en desarrollo): `http://localhost:3000/docs`
 - Decisiones técnicas: [docs/decisiones.md](docs/decisiones.md)
 
 ## Convención de commits
