@@ -136,3 +136,62 @@ Cada entrada explica qué se decidió, por qué y qué alternativas se descartar
 - **Correos repetidos:** el servicio normaliza el correo (`trim` + minúsculas) antes de buscar,
   y verifica antes de crear (409). Si dos registros llegan al mismo tiempo, ambos pasarían esa
   verificación, pero el índice `unique` de MongoDB solo deja insertar uno.
+
+  ## 015 — Autenticación con JWT
+
+- **Decisión:** al iniciar sesión, el servidor emite un token JWT firmado con `JWT_SECRET`
+  (algoritmo HS256). La app lo enviará en cada petición para identificarse.
+- **Por qué JWT:** el servidor no necesita guardar sesiones; verifica la firma del token.
+  Además, el mismo token servirá para identificar al usuario en los WebSockets de ubicación.
+- **Configuración:** `JwtModule.registerAsync` en `AuthModule`, leyendo clave y duración
+  validadas desde el `ConfigService` (mismo patrón que la conexión de Mongoose).
+- **Validación de la clave:** `JWT_SECRET` es obligatoria y de al menos 32 caracteres; una clave
+  corta se podría adivinar por fuerza bruta. Si se filtra, cambiarla invalida todos los tokens
+  emitidos (funciona como "botón de emergencia").
+
+## 016 — El token solo contiene el id del usuario
+
+- **Decisión:** el payload es `{ sub: <id del usuario> }`, más `iat` y `exp` que agrega la librería.
+- **Por qué:**
+  - El payload de un JWT solo está codificado (Base64), no cifrado: cualquiera puede leerlo.
+    Verificado en jwt.io. La firma impide _modificarlo_, no _leerlo_. Por eso nunca va nada secreto.
+  - Datos como el nombre o el correo pueden cambiar; el id no. Cuando se necesitan, se consultan
+    en la base a partir del id.
+  - Un token más pequeño viaja en cada petición.
+
+## 017 — Duración del token: 7 días
+
+- **Decisión:** `JWT_EXPIRES_IN=7d` por defecto (verificado: `exp - iat = 604800` segundos).
+- **Por qué:** equilibrio entre comodidad (no pedir la contraseña a cada rato en una app móvil)
+  y riesgo: un JWT no se puede revocar, así que un token robado sirve hasta que expira.
+- **Alternativa descartada por ahora:** token de acceso corto + _refresh token_ largo. Es más
+  seguro, pero añade complejidad que no se necesita en esta etapa.
+
+## 018 — Mismo mensaje para correo inexistente y contraseña incorrecta
+
+- **Decisión:** ambos casos responden 401 con "Correo o contraseña incorrectos", definido en
+  una sola constante (`INVALID_CREDENTIALS`).
+- **Por qué:** mensajes distintos permitirían a un atacante averiguar qué correos están
+  registrados (enumeración de usuarios) y concentrar ataques en ellos.
+- **Login sin longitud mínima de contraseña:** el `LoginDto` solo exige texto no vacío
+  (máximo 72). Si las reglas del registro cambian en el futuro, los usuarios antiguos podrán
+  seguir entrando, y no se revelan las reglas de las contraseñas. El máximo se mantiene para
+  evitar que se envíen textos enormes que consuman recursos del servidor.
+- **Código de respuesta:** el login responde 200 y no 201 (default de `@Post`), porque no crea
+  ningún recurso.
+
+## 019 — La respuesta del login se arma a mano
+
+- **Decisión:** se retorna `{ accessToken, user: { id, name, email } }`, construido campo por campo.
+- **Por qué:** el login consulta el usuario con `select('+password')`, así que el documento trae
+  el hash. Retornarlo completo lo expondría. Se usa una lista blanca en la salida: solo sale lo
+  que se escribe explícitamente, y un campo sensible agregado en el futuro no se filtra por accidente.
+
+## 020 — Lección: un `await` olvidado puede abrir una falla de seguridad
+
+- **Qué pasó:** en una primera versión, `bcrypt.compare(...)` se usó sin `await`. La variable
+  guardaba una promesa (siempre "verdadera"), así que la verificación nunca fallaba y cualquier
+  contraseña habría permitido entrar.
+- **Por qué es peligroso:** no genera ningún error; el código compila y parece funcionar.
+- **Cómo se detecta:** la prueba "contraseña incorrecta → 401" es obligatoria en cada cambio
+  del login.
