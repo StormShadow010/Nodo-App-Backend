@@ -24,4 +24,18 @@ export const envValidationSchema = Joi.object({
         'MONGO_URI debe empezar por mongodb:// o mongodb+srv://',
       'any.required': 'MONGO_URI es obligatoria',
     }),
+
+  //JWT_SECRET
+  JWT_SECRET: Joi.string().min(32).required().messages({
+    'string.min': 'JWT_SECRET debe tener al menos 32 caracteres',
+    'any.required': 'JWT_SECRET es obligatoria',
+  }),
+  //JWT_EXPIRES_IN
+  JWT_EXPIRES_IN: Joi.string()
+    .pattern(/^\d+[smhd]$/)
+    .default('7d')
+    .messages({
+      'string.pattern.base':
+        'JWT_EXPIRES_IN debe tener formato como 15m, 12h o 7d',
+    }),
 });

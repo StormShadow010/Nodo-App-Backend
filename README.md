@@ -14,6 +14,7 @@ El frontend es una app en Ionic + Angular + Capacitor (repositorio aparte).
 - **@nestjs/config + Joi** para variables de entorno validadas
 - **class-validator + class-transformer** para validar los datos de entrada
 - **bcryptjs** para cifrar contraseñas
+- **@nestjs/jwt** para la autenticación con tokens JWT
 - **Helmet** para cabeceras de seguridad
 - **Swagger (@nestjs/swagger)** para la documentación interactiva
 - **@nestjs/terminus** para el health check
@@ -29,11 +30,20 @@ El frontend es una app en Ionic + Angular + Capacitor (repositorio aparte).
 
 ```bash
 pnpm install
-cp .env.example .env   # luego completa MONGO_URI
+cp .env.example .env   # luego completa las variables
 ```
 
-> Si pnpm muestra el aviso de _build scripts_ ignorados, ejecuta `pnpm approve-builds`
-> (ver la decisión 002 en `docs/decisiones.md`).
+- El archivo `.env` **no está en el repositorio** (contiene credenciales). Se crea en cada equipo
+  a partir de `.env.example`.
+- En MongoDB Atlas → **Network Access**, autoriza la IP del equipo donde corre la app.
+- Si pnpm muestra el aviso de _build scripts_ ignorados, ejecuta `pnpm approve-builds`
+  (ver la decisión 002 en `docs/decisiones.md`).
+
+Para generar un `JWT_SECRET` aleatorio:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
 
 ## Ejecución
 
@@ -45,11 +55,13 @@ pnpm start:prod   # ejecuta la versión compilada
 
 ## Variables de entorno
 
-| Variable    | Obligatoria | Descripción                                             |
-| ----------- | ----------- | ------------------------------------------------------- |
-| `PORT`      | No (3000)   | Puerto HTTP                                             |
-| `NODE_ENV`  | No          | `development`, `production` o `test`                    |
-| `MONGO_URI` | Sí          | Cadena de conexión de MongoDB, con el nombre de la base |
+| Variable         | Obligatoria | Descripción                                               |
+| ---------------- | ----------- | --------------------------------------------------------- |
+| `PORT`           | No (3000)   | Puerto HTTP                                               |
+| `NODE_ENV`       | No          | `development`, `production` o `test`                      |
+| `MONGO_URI`      | Sí          | Cadena de conexión de MongoDB, con el nombre de la base   |
+| `JWT_SECRET`     | Sí          | Clave para firmar los tokens. Mínimo 32 caracteres        |
+| `JWT_EXPIRES_IN` | No (`7d`)   | Duración del token. Formato: número + `s`, `m`, `h` o `d` |
 
 La app valida estas variables al arrancar y **no inicia** si falta alguna obligatoria
 o tiene un formato inválido.
@@ -69,7 +81,8 @@ src/
       users.service.ts       → acceso a datos de usuarios
     auth/
       dto/register.dto.ts    → validación del registro
-      auth.service.ts        → registro (normalización, duplicados, cifrado)
+      dto/login.dto.ts       → validación del login
+      auth.service.ts        → registro y login (cifrado, verificación, emisión del JWT)
       auth.controller.ts     → rutas /auth
 docs/
   decisiones.md              → registro de decisiones técnicas
@@ -79,10 +92,11 @@ docs/
 
 Base: `http://localhost:3000/api/v1`
 
-| Método | Ruta             | Descripción                                                                         |
-| ------ | ---------------- | ----------------------------------------------------------------------------------- |
-| GET    | `/health`        | Estado del servidor y de MongoDB. 200 si todo está bien, 503 si la base no responde |
-| POST   | `/auth/register` | Registra un usuario. 201 creado · 400 datos inválidos · 409 correo repetido         |
+| Método | Ruta             | Descripción                                                                                                   |
+| ------ | ---------------- | ------------------------------------------------------------------------------------------------------------- |
+| GET    | `/health`        | Estado del servidor y de MongoDB. 200 si todo está bien, 503 si la base no responde                           |
+| POST   | `/auth/register` | Registra un usuario. 201 creado · 400 datos inválidos · 409 correo repetido                                   |
+| POST   | `/auth/login`    | Inicia sesión. 200 con `accessToken` y datos del usuario · 400 datos inválidos · 401 credenciales incorrectas |
 
 ## Documentación
 
